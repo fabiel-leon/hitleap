@@ -1,0 +1,21 @@
+---
+- name: restart xrdp
+  service: name=xrdp state=reloaded
+  listen: restart-xrdp
+
+- name: allow xrdp
+  ufw: rule=allow port=3389
+  listen: restart-xrdp
+
+- name: allow xrdp 3350
+  ufw: rule=allow port=3350
+  listen: restart-xrdp
+
+- name: allow xrdp 5910
+  ufw: rule=allow port=5910
+  listen: restart-xrdp
+
+
+- name: allow xrdp 5911
+  ufw: rule=allow port=5911
+  listen: restart-xrdp

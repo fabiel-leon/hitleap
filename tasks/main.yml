@@ -1,0 +1,145 @@
+---
+
+- name: Create the hitleap group
+  group: name=hitleap state=present
+
+#pass generated with mkpasswd --method=SHA-512 Hitleap123*
+- name: Create the hitleap user
+  user: name=hitleap state=present createhome=yes group=hitleap shell=/bin/bash password=$6$Ou0nyZnuiefYDH$kIi8Ruhp4iUyrX0l2aWq1G1m7pna9Q/woyo.PKe5bJG.JUsptD7LdOtAeIXSCJzCex1QpAcUdRVHsAEWjF0qx/
+
+- name: Set authorized key for user hitleap copying it from current user
+  authorized_key:
+    user: hitleap
+    state: present
+    key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
+
+- name: General | Instalación de paquetes requeridos.
+  apt: name={{ item }} state=latest update_cache=yes
+  with_items:
+    - unzip 
+    - tar
+    - xz-utils
+    - lzop
+    - gzip
+    - pigz
+    - xorg 
+    - xrdp 
+    - cron
+    - libssl1.0.0
+    - libssl-dev
+#
+    - git 
+    - phantomjs
+    - pkg-config 
+    - build-essential 
+    # - imagemagick 
+    - libgconf-2-4 
+    - nmap 
+    - software-properties-common 
+    # - swaks 
+    - libnet-ssleay-perl
+    # - node-gyp 
+    # - node-bindings 
+    - logrotate 
+    # - ufw 
+    # - gyp 
+    # - apache2-utils
+    # - nano 
+    - jwm 
+    - libcurl3 
+    - htop 
+    - firefox 
+    - chromium-browser 
+    - flashplugin-installer 
+  notify: 
+   - restart-xrdp
+
+- name: Dowload otohitsapp from the web
+  get_url:
+    group: hitleap
+    url: https://www.otohits.net/dl/OtohitsApp_3110_Linux.zip
+    dest: /home/hitleap/OtohitsApp.zip
+  # when: stat_result.stat.exists == False
+
+- name: Unarchive otohitsapp from the web
+  unarchive:
+    owner: hitleap
+    group: hitleap
+    src: /home/hitleap/OtohitsApp.zip
+    dest: /home/hitleap
+    remote_src: yes
+
+- name: set mode executable for otohits
+  file:
+    path: /home/hitleap/OtohitsApp/OtohitsApp
+    owner: hitleap
+    group: hitleap
+    mode: u+rwx
+
+- name: Create crash recovery executable for otohits
+  copy:
+    src: files/launch-otohits.sh
+    dest: /home/hitleap/launch-otohits.sh
+    owner: hitleap
+    group: hitleap
+    mode: u+rwx
+
+- name: copiar otohits ini config
+  copy:
+    src: files/otohits.ini
+    dest: /home/hitleap/OtohitsApp/otohits.ini
+    owner: hitleap
+    group: hitleap
+    mode: u=rw
+
+# HITLEAP  ##################################################################
+
+- name: Check that the /home/hitleap/HitLeapViewer.tar.xz exists
+  stat:
+    path: /home/hitleap/HitLeapViewer.tar.xz
+  register: stat_result
+
+- name: Download HitLeap-Viewer
+  get_url:
+    group: hitleap
+    url: http://www.mediafire.com/file/ivaphpvs3h0wyyb/HitLeap_Viewer.tar.xz
+    dest: /home/hitleap/HitLeapViewer.tar.xz
+  # when: stat_result.stat.exists == False
+  # when:  stat_result.stat.exists is defined and stat_result.stat.exists
+
+# tar xpvf /root/HitLeapViewer.tar.xz -C /root
+- name: descomprimir HitLeap-Viewer from the dowload 
+  command: tar xpvf /home/hitleap/HitLeapViewer.tar.xz -C /home/hitleap creates=/home/hitleap/app/HitLeap-Viewer
+
+- name: Create hitleap executable from HitLeap.desktop
+  file:
+    src: /home/hitleap/app/HitLeap-Viewer
+    dest: /home/hitleap/hitleap
+    owner: hitleap
+    group: hitleap
+    state: link
+    mode: u+rwx
+
+- name: Create crash recovery executable for hitLeap
+  copy:
+    src: files/launch-hitleap.sh
+    dest: /home/hitleap/launch-hitleap.sh
+    owner: hitleap
+    group: hitleap
+    mode: u+rwx
+
+- name: Create cron to delete chromium tempfiles
+  cron:
+    name: 'delete chromium tempfiles'
+    minute: '0'
+    hour: '5'
+    user: 'root'
+    job: 'rm /tmp/.org.chromium.Chromium*' 
+
+- set_fact:
+    host_ipv6address: "{% for address in hostvars[inventory_hostname]['ansible_eth0']['ipv6'] if address.scope == 'global' %}{{ address.address }}{% endfor %}"
+
+- name: eliminar ipv6 del server
+  command: /sbin/ip -6 addr del {{host_ipv6address}}/64 dev eth0
+  when: host_ipv6address
